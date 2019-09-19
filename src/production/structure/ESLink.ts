@@ -13,6 +13,7 @@ import * as ts from 'typescript';
 import { ProductionModule } from '../ProductionModule';
 import { ExportReference, ExportReferenceType } from './ExportReference';
 import { ImportVariable } from './ImportVariable';
+import { ESClass } from './ESClass';
 
 export enum ESLinkType {
   ExportDeclaration,
@@ -39,11 +40,12 @@ export class ESLink {
 
   public imports: Array<ImportVariable>;
   public exports: Array<ExportReference>;
+  public classes: Array<ESClass>;
 
   private importDeclarationNode: ImportDeclaration;
   private exportDeclarationNode: ExportDeclaration;
   public exportAssignmentNode: ExportAssignment;
-  public exportObjectDeclarationNode: FunctionDeclaration;
+  public exportObjectDeclarationNode: FunctionDeclaration | ClassDeclaration;
 
   constructor(public productionModule: ProductionModule) {
     this.exports = [];
@@ -246,7 +248,7 @@ export class ESLink {
     this.productionModule.context.dynamicLinks.push(this);
   }
 
-  createExportObjectDeclaration(node: FunctionDeclaration) {
+  createExportObjectDeclaration(node: FunctionDeclaration | ClassDeclaration) {
     this.exportObjectDeclarationNode = node;
     this.type = ESLinkType.ExportDeclaration;
     const ref = new ExportReference(this);
@@ -257,6 +259,17 @@ export class ESLink {
     ref.objectNode = node;
     ref.type = ExportReferenceType.Object;
     this.exports.push(ref);
+
+    if (ts.isClassDeclaration(node.compilerNode)) {
+      if (!this.classes) this.classes = [];
+      const cls = new ESClass({
+        link: this,
+        node: node as ClassDeclaration,
+        ref: ref,
+      });
+      cls.parse();
+      this.classes.push(cls);
+    }
   }
 
   public toJSON() {
